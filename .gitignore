@@ -1,3 +1,14 @@
+.vscode
+datasets
+datasets_citygs
+tmp
+.env
+*.pkl
+*.zip
+*.pt
+*.pth
+*.ckpt
+
 .idea
 outputs
 camera_paths

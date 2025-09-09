@@ -1,1 +1,1 @@
-git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+git+https://github.com/Xusj0w0/tiny-cuda-nn/#subdirectory=bindings/torch
