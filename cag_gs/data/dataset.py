@@ -651,7 +651,7 @@ class BatchedCacheDataLoader(CacheDataLoader):
             batch = cached[st:ed]
 
             # collect batch infos
-            camera_list, image_names, gt_image_list, mask_list, extra_data_list = [], [], [], [], []
+            camera_list, image_names, gt_image_list, mask_list, extra_data_list = [] * 5
             for d in batch:
                 camera, (image_name, gt_image, mask), extra_data = d
                 camera_list.append(camera)
@@ -676,16 +676,10 @@ class BatchedCacheDataLoader(CacheDataLoader):
                     _masks.append(_mask)
             masks = torch.stack(_masks, dim=0) if len(_masks) > 0 else None
 
-            # organize extra_data in keys
-            extra_data = {}
-            _extra_data = None
-            for d in extra_data_list:
-                if d is not None:
-                    _extra_data = d
-                    break
-            if _extra_data is not None:
-                for key in _extra_data.keys():
-                    extra_data[key] = [d[key] for d in extra_data_list]
+            # TODO: extra_data
+            extra_data = extra_data_list[0].__class__()
+            for key in extra_data_list[0].keys():
+                extra_data[key] = [d[key] for d in extra_data_list]
 
             batched.append((cameras, (image_names, images, masks), extra_data))
 

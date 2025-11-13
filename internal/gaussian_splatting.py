@@ -169,7 +169,11 @@ class GaussianSplatting(LightningModule):
     def setup(self, stage: str):
         if stage == "fit":
             if self.hparams["initialize_from"] is None:
-                self.gaussian_model.setup_from_pcd(xyz=self.trainer.datamodule.point_cloud.xyz, rgb=self.trainer.datamodule.point_cloud.rgb / 255.)
+                self.gaussian_model.setup_from_pcd(
+                    xyz=self.trainer.datamodule.point_cloud.xyz,
+                    rgb=self.trainer.datamodule.point_cloud.rgb / 255.,
+                    cameras=self.trainer.datamodule.dataparser_outputs.train_set.cameras,
+                )
             else:
                 self._initialize_gaussians_from_trained_model()
         else:
@@ -727,14 +731,14 @@ class GaussianSplatting(LightningModule):
         )
         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
         self.trainer.save_checkpoint(checkpoint_path)
-        with torch.no_grad():
-            xyz = self.gaussian_model.get_xyz
-            rgb = eval_sh(0, self.gaussian_model.get_features[:, :1, :].transpose(1, 2), None)
-            store_ply(os.path.join(
-                self.hparams["output_path"],
-                "checkpoints",
-                "epoch={}-step={}{}-xyz_rgb.ply".format(self.trainer.current_epoch, self.trainer.global_step, checkpoint_name_suffix),
-            ), xyz.cpu().numpy(), ((rgb + 0.5).clamp(min=0., max=1.) * 255).to(torch.int).cpu().numpy())
+        # with torch.no_grad():
+        #     xyz = self.gaussian_model.get_xyz
+        #     rgb = eval_sh(0, self.gaussian_model.get_features[:, :1, :].transpose(1, 2), None)
+        #     store_ply(os.path.join(
+        #         self.hparams["output_path"],
+        #         "checkpoints",
+        #         "epoch={}-step={}{}-xyz_rgb.ply".format(self.trainer.current_epoch, self.trainer.global_step, checkpoint_name_suffix),
+        #     ), xyz.cpu().numpy(), ((rgb + 0.5).clamp(min=0., max=1.) * 255).to(torch.int).cpu().numpy())
         print("Checkpoint saved to {}".format(checkpoint_path))
 
     def set_datamodule_device(self, device):

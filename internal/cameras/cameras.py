@@ -1,5 +1,5 @@
-from typing import Optional, Union
 from dataclasses import dataclass, field
+from typing import List, Optional, Union
 
 import torch
 from torch import Tensor
@@ -117,10 +117,10 @@ class Cameras:
 
     def _calculate_w2c(self):
         # build world-to-camera transform matrix
-        self.world_to_camera = torch.zeros((self.R.shape[0], 4, 4))
+        self.world_to_camera = self.R.new_zeros((self.R.shape[0], 4, 4))
         self.world_to_camera[:, :3, :3] = self.R
         self.world_to_camera[:, :3, 3] = self.T
-        self.world_to_camera[:, 3, 3] = 1.
+        self.world_to_camera[:, 3, 3] = 1.0
         self.world_to_camera = torch.transpose(self.world_to_camera, 1, 2)
 
     def _calculate_ndc_projection_matrix(self):
@@ -135,15 +135,21 @@ class Cameras:
         zfar = 100.0
         znear = 0.01
 
-        tanHalfFovY = torch.tan((self.fov_y / 2))
-        tanHalfFovX = torch.tan((self.fov_x / 2))
+        # assume principal point is image center
+        # tanHalfFovY = torch.tan((self.fov_y / 2))
+        # tanHalfFovX = torch.tan((self.fov_x / 2))
 
-        top = tanHalfFovY * znear
-        bottom = -top
-        right = tanHalfFovX * znear
-        left = -right
+        # top = tanHalfFovY * znear
+        # bottom = -top
+        # right = tanHalfFovX * znear
+        # left = -right
 
-        P = torch.zeros(self.fov_y.shape[0], 4, 4)
+        top = znear * self.cy / self.fy
+        bottom = -znear * (self.height - self.cy) / self.cy
+        left = -znear * (self.width - self.cx) / self.fx
+        right = znear * self.cx / self.fx
+
+        P = self.fov_y.new_zeros((self.fov_y.shape[0], 4, 4))
 
         z_sign = 1.0
 
@@ -205,3 +211,49 @@ class Cameras:
     def __iter__(self):
         for i in range(len(self)):
             yield self[i]
+
+    @property
+    def device(self) -> torch.device:
+        return self.R.device
+
+
+@dataclass
+class BatchedCameras(Cameras):
+    fov_x: Tensor = field(init=True)
+    fov_y: Tensor = field(init=True)
+    world_to_camera: Tensor = field(init=True)
+    projection: Tensor = field(init=True)
+    full_projection: Tensor = field(init=True)
+    camera_center: Tensor = field(init=True)
+
+    def __post_init__(self):
+        pass
+
+    @classmethod
+    def batchify_cameras(cls, cameras: Union[Camera, Cameras, List[Camera]]):
+        if isinstance(cameras, Cameras):
+            return cameras
+        elif isinstance(cameras, Camera):
+            params = {}
+            for k in cameras.__dataclass_fields__:
+                v = getattr(cameras, k)
+                if isinstance(v, torch.Tensor):
+                    v = v.unsqueeze(0)
+                params[k] = v
+            return cls(**params)
+        elif cls.is_camera_list(cameras):
+            params = {}
+            for k in cameras[0].__dataclass_fields__:
+                v = [getattr(cam, k) for cam in cameras]
+                if all([isinstance(vi, torch.Tensor) for vi in v]):
+                    v = torch.stack(v, dim=0)
+                else:
+                    v = None
+                params[k] = v
+            return cls(**params)
+        else:
+            raise ValueError("Unsupported input type.")
+
+    @classmethod
+    def is_camera_list(cls, cameras):
+        return isinstance(cameras, list) and all([isinstance(cam, Camera) for cam in cameras])
