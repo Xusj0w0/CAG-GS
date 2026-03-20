@@ -15,11 +15,6 @@ class NumpyData:
 
     _KEY: ClassVar[str] = "base"
 
-    def __post_init__(self):
-        _shape = self.parse_shape()
-        if _shape is not None:
-            self._shape = tuple(_shape)
-
     def parse_shape(self) -> List[int]:
         if not (osp.exists(self.path) and self.path.endswith(".npy")):
             return None
@@ -42,6 +37,12 @@ class NumpyData:
         self._shape = header_dict["shape"]
         return self._shape
 
+    @property
+    def shape(self):
+        if not hasattr(self, "_shape"):
+            self._shape = self.parse_shape()
+        return self._shape
+
     def load_data(self) -> torch.Tensor:
         if osp.exists(self.path) and self.path.endswith(".npy"):
             data = torch.from_numpy(np.load(self.path))
@@ -55,7 +56,7 @@ class NumpyData:
 
 @dataclass
 class InverseDepthData(NumpyData):
-    shape: Tuple[int] = field(default_factory=lambda: (-1, -1))
+    _shape: Tuple[int] = field(default_factory=lambda: (-1, -1))
     scale: float = 1.0
     offset: float = 0.0
 

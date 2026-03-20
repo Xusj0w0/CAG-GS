@@ -94,7 +94,7 @@ class HashEncoding(Encoding):
 
         self.hash_offset = levels * self.hash_table_size
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         self.hash_table = torch.empty(0)
         if implementation == "torch":
             self.build_nn_modules()
@@ -110,12 +110,12 @@ class HashEncoding(Encoding):
                 growth_factor=self.growth_factor,
                 interpolation=interpolation,
             )
-            self.tcnn_encoding = tcnn.Encoding(
+            self.tcnn_model = tcnn.Encoding(
                 n_input_dims=self.in_dim,
                 encoding_config=encoding_config,
             )
 
-        if self.tcnn_encoding is None:
+        if self.tcnn_model is None:
             assert (
                 interpolation is None or interpolation == "Linear"
             ), f"interpolation '{interpolation}' is not supported for torch encoding backend"
@@ -209,8 +209,8 @@ class HashEncoding(Encoding):
         return torch.flatten(encoded_value, start_dim=-2, end_dim=-1)  # [..., num_levels * features_per_level]
 
     def forward(self, in_tensor: Float[Tensor, "*bs input_dim"]) -> Float[Tensor, "*bs output_dim"]:
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.pytorch_fwd(in_tensor)
 
 
@@ -265,12 +265,12 @@ class MixedHashEncoding(Encoding):
                 growth_factor_2d=self.growth_factor_2d,
                 interpolation=interpolation,
             )
-            self.tcnn_encoding = tcnn.Encoding(
+            self.tcnn_model = tcnn.Encoding(
                 n_input_dims=9,
                 encoding_config=encoding_config,
             )
 
-        if self.tcnn_encoding is None:
+        if self.tcnn_model is None:
             assert (
                 interpolation is None or interpolation == "Linear"
             ), f"interpolation '{interpolation}' is not supported for torch encoding backend"
@@ -371,8 +371,8 @@ class MixedHashEncoding(Encoding):
 
     def forward(self, in_tensor: Shaped[Tensor, "*bs input_dim"]) -> Shaped[Tensor, "*bs output_dim"]:
         in_tensor = self.reorganize_input(in_tensor)
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.pytorch_fwd(in_tensor)
 
 
@@ -393,13 +393,13 @@ class SHEncoding(Encoding):
 
         self.levels = levels
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "tcnn" and not TCNN_EXISTS:
             # print_tcnn_speed_warning("SHEncoding")
             pass
         elif implementation == "tcnn":
             encoding_config = self.get_tcnn_encoding_config(levels=self.levels)
-            self.tcnn_encoding = tcnn.Encoding(
+            self.tcnn_model = tcnn.Encoding(
                 n_input_dims=3,
                 encoding_config=encoding_config,
             )
@@ -422,8 +422,8 @@ class SHEncoding(Encoding):
         return self.components_from_spherical_harmonics(degree=self.levels - 1, directions=in_tensor)
 
     def forward(self, in_tensor: Float[Tensor, "*bs input_dim"]) -> Float[Tensor, "*bs output_dim"]:
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.pytorch_fwd(in_tensor)
 
     @classmethod

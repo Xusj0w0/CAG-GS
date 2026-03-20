@@ -639,59 +639,53 @@ class BatchedCacheDataLoader(CacheDataLoader):
             dataset, max_cache_num, shuffle, seed, distributed, world_size, global_rank, async_caching, **kwargs
         )
 
-    def _cache_data(self, indices: list, pbar_leave: bool = True):
-        cached = super()._cache_data(indices, pbar_leave)
-        batch_size = self.batch_size
-        if batch_size <= 1:
-            return cached
-
-        batched = []
-        for st in range(0, len(cached), batch_size):
-            ed = min(st + batch_size, len(cached))
-            batch = cached[st:ed]
-
-            # collect batch infos
-            camera_list, image_names, gt_image_list, mask_list, extra_data_list = [], [], [], [], []
-            for d in batch:
-                camera, (image_name, gt_image, mask), extra_data = d
-                camera_list.append(camera)
-                image_names.append(image_name)
-                gt_image_list.append(gt_image)
-                mask_list.append(mask)
-                extra_data_list.append(extra_data)
-
-            # batchify cameras
-            cameras = BatchedCameras.batchify_cameras(camera_list)
-
-            # batchify images
-            images = torch.stack(gt_image_list, dim=0)  # [B, C, H, W]
-
-            # batchify masks
-            _masks = []
-            if any([m is not None for m in mask_list]):
-                for i, m in enumerate(masks):  # m is None or [C, H, W] tensor
-                    _mask = m
-                    if _mask is None:
-                        _mask = images[i].new_ones(images[i].shape)
-                    _masks.append(_mask)
-            masks = torch.stack(_masks, dim=0) if len(_masks) > 0 else None
-
-            # organize extra_data in keys
-            extra_data = {}
-            _extra_data = None
-            for d in extra_data_list:
-                if d is not None:
-                    _extra_data = d
-                    break
-            if _extra_data is not None:
-                for key in _extra_data.keys():
-                    extra_data[key] = [d[key] for d in extra_data_list]
-
-            batched.append((cameras, (image_names, images, masks), extra_data))
-
-        return batched
-
     def __iter__(self):
-        for _ in range(self.batch_size):
-            for item in super().__iter__():
-                yield item
+        import itertools
+
+        iterator_fn = super().__iter__
+        iterator = itertools.chain.from_iterable([iterator_fn() for _ in range(self.batch_size)])
+
+        batch = []
+        for item in iterator:
+            batch.append(item)
+            if len(batch) == self.batch_size:
+                yield self._collate_batch(batch)
+                batch = []
+
+        if len(batch) > 0:
+            yield self._collate_batch(batch)
+
+    def _collate_batch(self, batch):
+        camera_list, images_names, gt_image_list, mask_list, extra_data_list = [], [], [], [], []
+        for d in batch:
+            camera, (image_name, gt_image, mask), extra_data = d
+            camera_list.append(camera)
+            images_names.append(image_name)
+            gt_image_list.append(gt_image)
+            mask_list.append(mask)
+            extra_data_list.append(extra_data)
+        
+        cameras = BatchedCameras.batchify_cameras(camera_list)
+        images = torch.stack(gt_image_list, dim =0)  # [B, C, H, W]
+        # batchify masks
+        if any(m is not None for m in mask_list):
+            masks = []
+            for i, m in enumerate(mask_list):
+                if m is None:
+                    m = images[i].new_ones(images[i].shape)
+                masks.append(m)
+            mask = torch.stack(masks, dim=0)  # [B, C, H, W]
+        else:
+            mask = None
+        # batchify extra_data
+        extra_data = {}
+        _extra_data_instance = None
+        for d in extra_data_list:
+            if d is not None:
+                _extra_data_instance = d
+                break
+        if _extra_data_instance is not None:
+            for key in _extra_data_instance.keys():
+                extra_data[key] = [d[key] for d in extra_data_list]
+        
+        return cameras, (images_names, images, mask), extra_data

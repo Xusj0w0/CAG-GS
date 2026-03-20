@@ -143,6 +143,9 @@ class ImplicitModelMixin:
     def compute_features(self, valid_camera_ids: torch.Tensor, valid_anchor_ids: torch.Tensor):
         return self.get_features[valid_anchor_ids]
 
+    def get_features_for_rasterization(self, anchor_ids: torch.Tensor):
+        return self.gaussians["features"][anchor_ids]
+
     @property
     def get_anchors(self) -> torch.Tensor:
         return self.gaussians["means"]
@@ -184,6 +187,10 @@ class ImplicitModelMixin:
 
     @property
     def get_xyz(self) -> torch.Tensor:
+        return self.gaussians["means"]
+
+    @property
+    def get_anchor(self) -> torch.Tensor:
         if self.neural_gaussians is not None:
             return self.neural_gaussians.means
         return None

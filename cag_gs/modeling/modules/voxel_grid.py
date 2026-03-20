@@ -19,7 +19,7 @@ class VoxelGrid:
     outlier_ratio: float = 0.001
     """ outlier ratio for building bounding box, use `torch.quantile` to filter outlier points """
 
-    extend_ratio: float = 0.1
+    extend_ratio: float = 0.2
     """ extend ratio for building bounding box """
 
     transform: List[float] = field(default_factory=lambda: [1.0] + [0.0] * 6)
@@ -122,7 +122,7 @@ class VoxelGridModule(nn.Module):
             raise ValueError("Points must be of shape [N, 3]")
         if self.rotation is None:
             return points
-        return points @ self.rotation.T.to(points) + self.transition.to(points)
+        return points @ self.rotation.T.to(points) + self.translation.to(points)
 
     def apply_inverse_transform(self, points: torch.Tensor) -> torch.Tensor:
         """
@@ -135,7 +135,7 @@ class VoxelGridModule(nn.Module):
             raise ValueError("Points must be of shape [N, 3]")
         if self.rotation is None:
             return points
-        return (points - self.transition.to(points)) @ self.rotation.to(points)
+        return (points - self.translation.to(points)) @ self.rotation.to(points)
 
     @property
     def rotation(self) -> Optional[torch.Tensor]:
@@ -151,11 +151,11 @@ class VoxelGridModule(nn.Module):
         return self._rotation
 
     @property
-    def transition(self) -> torch.Tensor:
-        "return transition vector as tensor"
-        if not hasattr(self, "_transition"):
-            self._transition = self.transform[4:].clone().detach().to(dtype=torch.float32)
-        return self._transition
+    def translation(self) -> torch.Tensor:
+        "return translation vector as tensor"
+        if not hasattr(self, "_translation"):
+            self._translation = self.transform[4:].clone().detach().to(dtype=torch.float32)
+        return self._translation
 
 
 @dataclass

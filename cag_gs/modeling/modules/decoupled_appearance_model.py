@@ -24,13 +24,13 @@ class DecoupledAppModelOptimization:
 
     max_steps: Optional[int] = None
 
-    optimizer: OptimizerConfig = field(default_factory=lambda: {"class_path": "Adam"})
-    scheduler: Scheduler = field(
-        default_factory=lambda: {
-            "class_path": "ExponentialDecayScheduler",
-            "init_args": {"max_steps": None},
-        }
-    )
+    # optimizer: OptimizerConfig = field(default_factory=lambda: {"class_path": "Adam"})
+    # scheduler: Scheduler = field(
+    #     default_factory=lambda: {
+    #         "class_path": "ExponentialDecayScheduler",
+    #         "init_args": {"max_steps": None},
+    #     }
+    # )
 
 
 @dataclass
@@ -77,18 +77,17 @@ class DecoupledAppearanceModule(nn.Module):
             self.config.optimization.max_steps = pl_module.trainer.max_steps
 
         optimization = self.config.optimization
-        optimizer_factory = optimization.optimizer
-        scheduler_factory = optimization.scheduler
+        # optimizer_factory = optimization.optimizer
+        # scheduler_factory = optimization.scheduler
 
         optimizers, schedulers = [], []
 
         def configure(params, lr_init: float, lr_final: float):
             if lr_init <= 0.0:
                 return
-            optimizer = optimizer_factory.instantiate(params, lr=lr_init, eps=1e-8)
+            optimizer = Adam().instantiate(params, lr=lr_init, eps=1e-8)
 
-            scheduler = deepcopy(scheduler_factory)
-            scheduler.lr_final = lr_final
+            scheduler = ExponentialDecayScheduler(lr_final=lr_final, max_steps=optimization.max_steps)
             scheduler = scheduler.instantiate().get_scheduler(optimizer, lr_init=lr_init)
 
             optimizers.append(optimizer)

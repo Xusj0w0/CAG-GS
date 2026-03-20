@@ -85,11 +85,13 @@ class SemanticConfig:
                 if osp.exists(filepath):
                     data = FeatureData(filepath)
                     if feature_dim < 0:
-                        feature_dim = data._shape[-1]
+                        feature_dim = data.shape[-1]
                 else:
                     data = FeatureData()
 
                 image_set.extra_data[idx][data._KEY] = data
+
+        dataparser_outputs.semantic_feature_dim = feature_dim
 
 
 @dataclass

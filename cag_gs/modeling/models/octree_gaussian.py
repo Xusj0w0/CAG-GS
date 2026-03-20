@@ -55,8 +55,8 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         :returns anchor_mask: [n_cameras, n_anchors], indicating which anchors are visible in each camera
         """
         anchors = self.get_anchors
-        pred_levels = self.voxel_grid.predict_level(anchors, cameras)
-        mapped_levels = self.voxel_grid.map_to_int_level(pred_levels, self.max_level)
+        pred_levels = self.voxel_grid.predict_level(anchors, cameras) + self.get_extra_levels
+        mapped_levels = self.voxel_grid.map_to_int_level(pred_levels, self.activate_level)
         transition_mask = None
         if getattr(mapped_levels, "_progressive_frac", None) is not None:
             transition_mask = self.get_levels == mapped_levels
@@ -88,7 +88,7 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         from simple_knn._C import distCUDA2
 
         cameras: Cameras = kwargs.pop("cameras", None)
-        # xyz, rgb = xyz[::16], rgb[::16]
+        # xyz, rgb = xyz[::4], rgb[::4]
         points = torch.from_numpy(xyz).to(cameras[0].device).float()
         self.voxel_grid = self.config.voxel_grid.instantiate(points=points, cameras=cameras, **kwargs)
 
@@ -191,7 +191,7 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         # setup progressive training
         self._activate_level = self.max_level
         if self.config.optimization.progressive:
-            self._activate_level = np.searchsorted(self.coarse_intervals, module.trainer.global_step)
+            self._activate_level = np.searchsorted(self.coarse_intervals, module.trainer.global_step) + 1 + self.start_level
         module.on_train_batch_end_hooks.append(self.activate_level_update)
 
         return optimizers, schedulers

@@ -5,7 +5,6 @@ import lightning
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torchvision
 
 from internal.cameras.cameras import BatchedCameras, Camera
 from internal.metrics.vanilla_metrics import VanillaMetrics, VanillaMetricsImpl
@@ -14,7 +13,7 @@ from ...data.dataset_utils import FeatureData, InverseDepthData
 from ..models.octree_gaussian import OctreeGaussianModel
 from ..models.scaffold_gaussian import ScaffoldGaussianModel
 from ..utils.implicit_wrappers import NeuralGaussianWrapper
-from ..utils.loss_utils import DepthLoss, WeightScheduler, WeightSchedulerBase
+from ..utils.loss_utils import DepthLoss, WeightScheduler
 
 
 @dataclass
@@ -86,8 +85,8 @@ class ImplicitMetricsImpl(VanillaMetricsImpl):
         metrics = {"loss": loss, "rgb_diff": rgb_diff_loss, "ssim": ssim_metric}
         prog_bar = {"loss": True, "rgb_diff": True, "ssim": True}
 
-        gaussians: NeuralGaussianWrapper = outputs["neural_gaussians"]
         if self.config.lambda_dreg > 0.0:
+            gaussians: NeuralGaussianWrapper = outputs["neural_gaussians"]
             dreg = torch.prod(gaussians.scales, dim=-1).mean()
             metrics["loss"] += self.config.lambda_dreg * dreg
             metrics["loss_dreg"] = dreg
@@ -104,7 +103,7 @@ class ImplicitMetricsImpl(VanillaMetricsImpl):
             loss_depth = torch.tensor(0.0, device=metrics["loss"].device)
             if len(valid_ids) > 0:
                 gt_depth = torch.stack([depth_list[idx] for idx in valid_ids], dim=0)
-                depth = outputs["inverse_depth"][valid_ids].squeeze(1)
+                depth = 1.0 / outputs["unbiased_depth"][valid_ids].squeeze(1).clamp_min(1e-2)
                 if masks is not None:
                     gt_depth = gt_depth * masks[valid_ids]
                     depth = depth * masks[valid_ids]
@@ -123,17 +122,18 @@ class ImplicitMetricsImpl(VanillaMetricsImpl):
 
             loss_feat = torch.tensor(0.0, device=metrics["loss"].device)
             if len(feature_list) > 0:
-                gt_feat = torch.stack(feature_list, dim=0)
+                gt_feat = torch.stack(feature_list, dim=0).permute(0, 3, 1, 2)
                 feat, feat_adapt = outputs["feature_map"], outputs["feature_map_adapt"]
+                if feat_adapt is not None:
+                    feat = feat_adapt
 
+                if gt_feat.shape[-2:] != feat.shape[-2:]:
+                    gt_feat = F.interpolate(gt_feat, size=feat.shape[-2:], mode="bilinear", align_corners=True)
                 if masks is not None:
                     masks_interp = F.interpolate(masks, size=feat.shape[-2:], mode="bilinear", align_corners=True)
                     gt_feat = gt_feat * masks_interp
-                    if feat_adapt is not None:
-                        feat_adapt = feat_adapt * masks_interp
-                    else:
-                        feat = feat * masks_interp
-                loss_feat = F.l1_loss(feat_adapt or feat, gt_feat)
+                    feat = feat * masks_interp
+                loss_feat = F.l1_loss(feat, gt_feat)
 
             metrics["loss"] += weight_feat * loss_feat
             metrics["loss_feat"] = loss_feat

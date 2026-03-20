@@ -1,4 +1,5 @@
 # modified from nerf-studio (https://github.com/nerfstudio-project/nerfstudio)
+import math
 from typing import Literal, Optional, Set, Tuple, Union
 
 import numpy as np
@@ -74,7 +75,7 @@ class MLP(FieldComponent):
         self.out_activation = out_activation
         self.net = None
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "torch":
             self.build_nn_modules()
         elif implementation == "tcnn" and not TCNN_EXISTS:
@@ -87,7 +88,7 @@ class MLP(FieldComponent):
                 layer_width=self.layer_width,
                 num_layers=self.num_layers,
             )
-            self.tcnn_encoding = tcnn.Network(
+            self.tcnn_model = tcnn.Network(
                 n_input_dims=in_dim,
                 n_output_dims=self.out_dim,
                 network_config=network_config,
@@ -155,9 +156,13 @@ class MLP(FieldComponent):
         return x
 
     def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.pytorch_fwd(in_tensor)
+
+    @property
+    def n_encoding_params(self) -> int:
+        return 0
 
 
 class MLPWithHashEncoding(FieldComponent):
@@ -218,14 +223,14 @@ class MLPWithHashEncoding(FieldComponent):
         self.out_activation = out_activation
         self.net = None
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "torch":
             self.build_nn_modules()
         elif implementation == "tcnn" and not TCNN_EXISTS:
             # print_tcnn_speed_warning("MLPWithHashEncoding")
             self.build_nn_modules()
         elif implementation == "tcnn":
-            self.model = tcnn.NetworkWithInputEncoding(
+            self.tcnn_model = tcnn.NetworkWithInputEncoding(
                 n_input_dims=self.in_dim,
                 n_output_dims=self.out_dim,
                 encoding_config=HashEncoding.get_tcnn_encoding_config(
@@ -268,7 +273,23 @@ class MLPWithHashEncoding(FieldComponent):
         self.model = torch.nn.Sequential(encoder, mlp)
 
     def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.model(in_tensor)
+
+    @property
+    def n_encoding_params(self) -> int:
+        if not hasattr(self, "_n_encoding_params"):
+            config = HashEncoding.get_tcnn_encoding_config(
+                num_levels=self.num_levels,
+                features_per_level=self.features_per_level,
+                log2_hashmap_size=self.log2_hashmap_size,
+                min_res=self.min_res,
+                growth_factor=self.growth_factor,
+            )
+            encoder = tcnn.Encoding(n_input_dims=self.in_dim, encoding_config=config)
+            self._n_encoding_params = encoder.params.shape[0]
+        return self._n_encoding_params
 
 
 class MLPWithMixedHashEncoding(FieldComponent):
@@ -321,14 +342,14 @@ class MLPWithMixedHashEncoding(FieldComponent):
         self.out_activation = out_activation
         self.net = None
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "torch":
             self.build_nn_modules()
         elif implementation == "tcnn" and not TCNN_EXISTS:
             # print_tcnn_speed_warning("MLPWithHashEncoding")
             self.build_nn_modules()
         elif implementation == "tcnn":
-            self.model = tcnn.NetworkWithInputEncoding(
+            self.tcnn_model = tcnn.NetworkWithInputEncoding(
                 n_input_dims=self.in_dim,
                 n_output_dims=self.out_dim,
                 encoding_config=MixedHashEncoding.get_tcnn_encoding_config(
@@ -381,7 +402,28 @@ class MLPWithMixedHashEncoding(FieldComponent):
 
     def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
         in_tensor = MixedHashEncoding.reorganize_input(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.model(in_tensor)
+
+    @property
+    def n_encoding_params(self) -> int:
+        if not hasattr(self, "_n_encoding_params"):
+            config = MixedHashEncoding.get_tcnn_encoding_config(
+                num_levels=self.num_levels,
+                features_per_level=self.features_per_level,
+                log2_hashmap_size=self.log2_hashmap_size,
+                min_res=self.min_res,
+                growth_factor=self.growth_factor,
+                num_levels_2d=self.num_levels_2d,
+                features_per_level_2d=self.features_per_level_2d,
+                log2_hashmap_size_2d=self.log2_hashmap_size_2d,
+                min_res_2d=self.min_res_2d,
+                growth_factor_2d=self.growth_factor_2d,
+            )
+            encoder = tcnn.Encoding(n_input_dims=9, encoding_config=config)
+            self._n_encoding_params = encoder.params.shape[0]
+        return self._n_encoding_params
 
 
 class MLPWithSHEncoding(FieldComponent):
@@ -410,14 +452,14 @@ class MLPWithSHEncoding(FieldComponent):
         self.out_activation = out_activation
         self.net = None
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "torch":
             self.build_nn_modules()
         elif implementation == "tcnn" and not TCNN_EXISTS:
             # print_tcnn_speed_warning("MLPWithHashEncoding")
             self.build_nn_modules()
         elif implementation == "tcnn":
-            self.model = tcnn.NetworkWithInputEncoding(
+            self.tcnn_model = tcnn.NetworkWithInputEncoding(
                 n_input_dims=self.in_dim,
                 n_output_dims=self.out_dim,
                 encoding_config=SHEncoding.get_tcnn_encoding_config(levels=self.levels),
@@ -444,7 +486,13 @@ class MLPWithSHEncoding(FieldComponent):
         self.model = torch.nn.Sequential(encoder, mlp)
 
     def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.model(in_tensor)
+
+    @property
+    def n_encoding_params(self):
+        return 0
 
 
 class MLPWithSHEncodingIdentity(FieldComponent):
@@ -480,14 +528,14 @@ class MLPWithSHEncodingIdentity(FieldComponent):
         self.out_activation = out_activation
         self.net = None
 
-        self.tcnn_encoding = None
+        self.tcnn_model = None
         if implementation == "torch":
             self.build_nn_modules()
         elif implementation == "tcnn" and not TCNN_EXISTS:
             # print_tcnn_speed_warning("MLPWithHashEncoding")
             self.build_nn_modules()
         elif implementation == "tcnn":
-            self.tcnn_encoding = tcnn.NetworkWithInputEncoding(
+            self.tcnn_model = tcnn.NetworkWithInputEncoding(
                 n_input_dims=self.in_dim,
                 n_output_dims=self.out_dim,
                 encoding_config=self.get_tcnn_encoding_config(levels=self.levels),
@@ -530,11 +578,10 @@ class MLPWithSHEncodingIdentity(FieldComponent):
         return self.model["mlp"](x)
 
     def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
+        if self.tcnn_model is not None:
+            return self.tcnn_model(in_tensor)
         return self.pytorch_fwd(in_tensor)
 
-    def forward(self, in_tensor: Float[Tensor, "*bs in_dim"]) -> Float[Tensor, "*bs out_dim"]:
-        if self.tcnn_encoding is not None:
-            return self.tcnn_encoding(in_tensor)
-        return self.pytorch_fwd(in_tensor)
+    @property
+    def n_encoding_params(self):
+        return 0

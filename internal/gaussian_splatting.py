@@ -173,6 +173,7 @@ class GaussianSplatting(LightningModule):
                     xyz=self.trainer.datamodule.point_cloud.xyz,
                     rgb=self.trainer.datamodule.point_cloud.rgb / 255.,
                     cameras=self.trainer.datamodule.dataparser_outputs.train_set.cameras,
+                    pl_module=self,
                 )
             else:
                 self._initialize_gaussians_from_trained_model()

@@ -1,3 +1,4 @@
+import math
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Optional, Tuple
@@ -12,10 +13,8 @@ from internal.cameras.cameras import Camera, Cameras
 from internal.models.gaussian import Gaussian, GaussianModel
 from internal.optimizers import Adam, OptimizerConfig
 from internal.schedulers import ExponentialDecayScheduler, Scheduler
-from internal.utils.general_utils import inverse_sigmoid
-from internal.utils.network_factory import NetworkFactory
 
-from .embeddings import MLP, SHEncoding
+from .embeddings import MLP, SHEncoding, initialize_weights
 
 
 @dataclass
@@ -208,6 +207,8 @@ class NeuralDecoderModule(nn.ModuleDict):
         self["color"] = color_decoder
         if self.config.use_feature_bank:
             self["feature_bank"] = feature_bank_decoder
+
+        initialize_weights(self)
 
     def training_setup(self, pl_module: lightning.LightningModule, **kwargs):
         if self.config.optimization.scheduler.max_steps is None:

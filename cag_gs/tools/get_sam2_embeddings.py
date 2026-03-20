@@ -20,7 +20,6 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from tqdm import tqdm
 
-from internal.utils.seganygs import SegAnyGSUtils
 from internal.utils.visualizers import Visualizers
 from utils.common import AsyncImageReader, AsyncImageSaver, AsyncNDArraySaver
 from utils.distibuted_tasks import (configure_arg_parser,
@@ -46,7 +45,7 @@ def make_parser():
         help="should in [32, 64, 256], corresponding shape are [32x256x256, 64x128x128, 256x64x64]",
     )
     parser.add_argument("--preview", action="store_true", default=False)
-    parser.add_argument("--ext", "-e", nargs="+", default=["jpg", "jpeg", "JPG", "JPEG"])
+    parser.add_argument("--ext", "-e", nargs="+", default=["jpg", "jpeg", "JPG", "JPEG", "png"])
     configure_arg_parser(parser)
     return parser
 
