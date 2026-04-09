@@ -212,27 +212,30 @@ class LoDVoxelGridModule(VoxelGridModule):
         self.start_level = torch.tensor(0, dtype=torch.int32)
         self.standard_dist = torch.tensor(0.0, dtype=torch.float32)
         self.visibility_threshold = torch.tensor(0.0, dtype=torch.float32)
+        self.register_grid_info()
 
-        if points is not None and cameras is not None:
-            self.transform = self.get_transform()
+    def setup(self, points: torch.Tensor, cameras: Cameras):
+        if points is None or cameras is None:
+            return
+        self.transform = self.get_transform()
 
-            points = points.cuda()
-            self.bounding_box = self.get_bounding_box(points)
-            self.voxel_size = self.get_voxel_size()
+        points = points.cuda()
+        self.bounding_box = self.get_bounding_box(points)
+        self.voxel_size = self.get_voxel_size()
 
-            # get params for LoD prediction
-            self.max_level, self.standard_dist = self.get_lod_params(points, cameras)
-            start_level = self.config.start_level
-            if start_level < 0:
-                start_level = int(self.max_level.item() // 2)
-            self.start_level = torch.tensor(start_level, dtype=torch.int32)
+        # get params for LoD prediction
+        self.max_level, self.standard_dist = self.get_lod_params(points, cameras)
+        start_level = self.config.start_level
+        if start_level < 0:
+            start_level = int(self.max_level.item() // 2)
+        self.start_level = torch.tensor(start_level, dtype=torch.int32)
 
-            visibility_threshold = torch.tensor(self.config.visibility_threshold)
-            if visibility_threshold < 0.0:
-                anchors, levels = self.voxelize(points)
-                mask = self.weed_out_by_level(anchors, levels, cameras, 0.0)
-                visibility_threshold = torch.mean(mask.float())
-            self.visibility_threshold = visibility_threshold
+        visibility_threshold = torch.tensor(self.config.visibility_threshold)
+        if visibility_threshold < 0.0:
+            anchors, levels = self.voxelize(points)
+            mask = self.weed_out_by_level(anchors, levels, cameras, 0.0)
+            visibility_threshold = torch.mean(mask.float())
+        self.visibility_threshold = visibility_threshold
 
         # register grid info
         self.register_grid_info()

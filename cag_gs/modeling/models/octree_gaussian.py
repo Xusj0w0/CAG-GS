@@ -88,9 +88,10 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         from simple_knn._C import distCUDA2
 
         cameras: Cameras = kwargs.pop("cameras", None)
-        # xyz, rgb = xyz[::4], rgb[::4]
+        xyz, rgb = xyz[::2], rgb[::2]
         points = torch.from_numpy(xyz).to(cameras[0].device).float()
-        self.voxel_grid = self.config.voxel_grid.instantiate(points=points, cameras=cameras, **kwargs)
+        self.voxel_grid = self.config.voxel_grid.instantiate()
+        self.voxel_grid.setup(points, cameras)
 
         anchors, levels = self.voxel_grid.voxelize(points)
         mask = self.voxel_grid.weed_out_by_level(anchors, levels, cameras, self.voxel_grid.visibility_threshold)
@@ -120,17 +121,21 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         self.neural_decoder.setup()
 
     def setup_from_number(self, n, *args, **kwargs):
-        self.voxel_grid = self.config.voxel_grid.instantiate(points=None, **kwargs)
+        self.voxel_grid = self.config.voxel_grid.instantiate()
 
         anchors = torch.zeros((n, 3), dtype=torch.float32)
         offsets = torch.zeros((n, self.config.n_offsets, 3), dtype=torch.float32)
         scales = torch.zeros((n, 6), dtype=torch.float32)
         features = torch.zeros((n, self.config.feature_dim), dtype=torch.float32)
+        levels = torch.zeros((n,), dtype=torch.int32)
+        extra_levels = torch.zeros((n,), dtype=torch.float32)
         property_dict = {
             "means": nn.Parameter(anchors, requires_grad=True),
             "offsets": nn.Parameter(offsets, requires_grad=True),
             "scales": nn.Parameter(scales, requires_grad=True),
             "features": nn.Parameter(features, requires_grad=True),
+            "levels": nn.Parameter(levels, requires_grad=False),
+            "extra_levels": nn.Parameter(extra_levels, requires_grad=False),
         }
         for name, prop in property_dict.items():
             self.set_property(name, prop)
@@ -191,7 +196,9 @@ class OctreeGaussianModel(GaussianModel, ImplicitModelMixin):
         # setup progressive training
         self._activate_level = self.max_level
         if self.config.optimization.progressive:
-            self._activate_level = np.searchsorted(self.coarse_intervals, module.trainer.global_step) + 1 + self.start_level
+            self._activate_level = (
+                np.searchsorted(self.coarse_intervals, module.trainer.global_step) + 1 + self.start_level
+            )
         module.on_train_batch_end_hooks.append(self.activate_level_update)
 
         return optimizers, schedulers

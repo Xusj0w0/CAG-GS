@@ -164,7 +164,8 @@ class GaussianSplatting(LightningModule):
         self.hparams["gaussians"] = gaussian_model.config
         self.gaussian_model = gaussian_model
 
-        print(f"initialize from {load_from}: sh_degree={self.gaussian_model.max_sh_degree}")
+        if hasattr(self.gaussian_model, "max_sh_degree"):
+            print(f"initialize from {load_from}: sh_degree={self.gaussian_model.max_sh_degree}")
 
     def setup(self, stage: str):
         if stage == "fit":

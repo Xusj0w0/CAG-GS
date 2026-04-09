@@ -21,10 +21,10 @@ class HashGridOptimization:
 
 @dataclass
 class HashGrid(InstantiatableConfig):
-    num_levels: int = 10
-    min_res: int = 2 << 4
-    max_res: int = 2 << 13
-    log2_hashmap_size: int = 16
+    num_levels: int = 5
+    min_res: int = 2 << 8
+    max_res: int = 2 << 12
+    log2_hashmap_size: int = 15
     features_per_level: int = 4
 
     use_mixed: bool = False
@@ -35,7 +35,7 @@ class HashGrid(InstantiatableConfig):
     features_per_level_2d: int = 4
 
     tcnn: bool = True
-    hash_init_scale: float = 1e-3
+    hash_init_scale: float = 1e-2
     interpolation: Literal["linear", "nearest", "smoothstep"] = "linear"
 
     mlp_n_layers: int = 2

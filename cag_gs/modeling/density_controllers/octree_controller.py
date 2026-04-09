@@ -16,8 +16,7 @@ from internal.density_controllers.density_controller import \
     Utils as OptimStatManipulator
 
 from ..models.octree_gaussian import OctreeGaussianModel
-from ..models.scaffold_gaussian import (NeuralGaussianWrapper,
-                                        ScaffoldGaussianModel)
+from ..models.scaffold_gaussian import ScaffoldGaussianModel
 from ..renders.implicit_renderer import ProjectionWrapper
 from .scaffold_controller import (DensifyCandidates, ScaffoldController,
                                   ScaffoldDensityControllerImpl)

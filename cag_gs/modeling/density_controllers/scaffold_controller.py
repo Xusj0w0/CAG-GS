@@ -118,11 +118,15 @@ class ScaffoldDensityControllerImpl(DensityControllerImpl):
                 self.density_status.update_status(outputs, gaussian_model.n_anchors)
 
             if global_step >= self.config.densify_from_iter and global_step % self.config.densification_interval == 0:
-                property_optimizers = []
-                for opt in optimizers:
-                    if all([p["name"] in gaussian_model._names for p in opt.param_groups]):
-                        property_optimizers.append(opt)
+                property_optimizers = self._exclude_invalid_optimizers(gaussian_model, optimizers)
                 self.densify_and_prune(gaussian_model, property_optimizers)
+
+    def _exclude_invalid_optimizers(self, gaussian_model, optimizers: List):
+        property_optimizers = []
+        for opt in optimizers:
+            if all([p["name"] in gaussian_model._names for p in opt.param_groups]):
+                property_optimizers.append(opt)
+        return property_optimizers
 
     def densify_and_prune(self, gaussian_model: Union[ScaffoldGaussianModel, OctreeGaussianModel], optimizers: list):
         # determine which anchors need to be densified
@@ -366,10 +370,10 @@ class DensityStatus(nn.Module):
 
         torch.cuda.empty_cache()
 
-    def prune_buffers(self, keep_mask: torch.Tensor, anchor_reset_mask: torch.Tensor):
+    def prune_buffers(self, keep_mask: torch.Tensor, anchor_reset_mask: Optional[torch.Tensor] = None):
         self.primitive_gradient_accum = self.primitive_gradient_accum.view(-1, self.n_offsets)[keep_mask].view(-1)
         self.primitive_denom = self.primitive_denom.view(-1, self.n_offsets)[keep_mask].view(-1)
-        if anchor_reset_mask.sum() > 0:
+        if anchor_reset_mask is not None and anchor_reset_mask.sum() > 0:
             self.anchor_opacity_accum[anchor_reset_mask] = 0.0
             self.anchor_denom[anchor_reset_mask] = 0
         self.anchor_opacity_accum = self.anchor_opacity_accum[keep_mask]

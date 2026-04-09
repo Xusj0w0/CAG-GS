@@ -47,10 +47,14 @@ class FeatureAdapterModule(nn.Module):
         self.config = config
 
     def setup(self, stage: str, pl_module=None, **kwargs):
-        self.network = nn.Sequential(
-            nn.Linear(self.config.in_dim, self.config.out_dim, bias=False),
+        # self.network = nn.Sequential(
+        #     nn.Linear(self.config.in_dim, self.config.out_dim, bias=False),
+        # )
+        # self.apply(_init_weights)
+        self.weight = nn.Parameter(
+            torch.zeros((self.config.in_dim, self.config.out_dim), dtype=torch.float32), requires_grad=True
         )
-        self.apply(_init_weights)
+        torch.nn.init.normal_(self.weight, mean=0.0, std=1e-3)
 
     def training_setup(self, pl_module: lightning.LightningModule, **kwargs):
         if self.config.optimization.max_steps is None:
@@ -74,7 +78,7 @@ class FeatureAdapterModule(nn.Module):
         configure(
             [
                 {
-                    "params": self.network.parameters(),
+                    "params": [self.weight],
                     "name": "feature_adapter",
                     "lr": optimization.lr_init,
                 }
@@ -85,4 +89,5 @@ class FeatureAdapterModule(nn.Module):
         return optimizers, schedulers
 
     def forward(self, x: torch.Tensor):
-        return self.network(x)
+        # return self.network(x)
+        return torch.einsum("...i, io -> ...o", x, self.weight)
