@@ -17,6 +17,8 @@ from .octree_controller import OctreeController, OctreeDensityControllerImpl
 
 @dataclass
 class PartitionableDensityController(OctreeController):
+    prune_ratio: float = 0.75
+
     def instantiate(self, *args, **kwargs):
         return PartitionableDensityControllerImpl(self)
 
@@ -59,8 +61,8 @@ class PartitionableDensityControllerImpl(OctreeDensityControllerImpl):
             )[2].squeeze(0)
             anchor_weights += scatter_sum(blend_weights, projections.anchor_ids, dim_size=n_anchors)
 
-        threshold = torch.quantile(anchor_weights, 0.75)
-        mask = anchor_weights > threshold
+        threshold = torch.quantile(anchor_weights, self.config.prune_ratio)
+        mask = anchor_weights >= threshold
         optimizers = self._exclude_invalid_optimizers(gaussian_model, pl_module.trainer.optimizers)
         self.prune_anchors(mask, gaussian_model, optimizers)
         self.density_status.prune_buffers(mask)

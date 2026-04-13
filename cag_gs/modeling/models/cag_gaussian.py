@@ -60,15 +60,20 @@ class ConsistentAnchorGuidedGaussianModel(OctreeGaussianModel):
         self.feature_adapter = self.config.feature_adapter.instantiate()
         self.feature_adapter.setup(stage="fit")
 
-    def setup_from_number(self, n, *args, **kwargs):
-        super().setup_from_number(n, *args, **kwargs)
+    def load_state_dict(self, state_dict, strict=True):
+        device = self.gaussians["means"].device
 
+        self.config.hash_grid.mlp_out_dim = state_dict["feature_adapter.weight"].shape[0]
         self.hash_grid = self.config.hash_grid.instantiate()
         self.hash_grid.setup(stage="fit")
+        self.hash_grid.to(device)
+
         self.config.feature_adapter.in_dim = self.hash_grid.config.mlp_out_dim
         self.config.feature_adapter.out_dim = self.config.feature_dim
         self.feature_adapter = self.config.feature_adapter.instantiate()
         self.feature_adapter.setup(stage="fit")
+        self.feature_adapter.to(device)
+        super().load_state_dict(state_dict, strict)
 
     def training_setup(self, module):
         optimizers, schedulers = super().training_setup(module)

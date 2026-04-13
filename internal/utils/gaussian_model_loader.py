@@ -227,6 +227,19 @@ class GaussianModelLoader:
 
         return model, renderer
 
+    @classmethod
+    def resume_optimization(cls, config, config_):
+        for k, v in config.__dict__.items():
+            if k == "optimization":
+                try:
+                    setattr(config, k, getattr(config_, k))
+                except:
+                    pass
+            else:
+                try:
+                    cls.resume_optimization(v, getattr(config_, k))
+                except:
+                    pass
 
 class VanillaPVGModelLoader:
     @staticmethod

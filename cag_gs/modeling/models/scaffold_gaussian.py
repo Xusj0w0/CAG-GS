@@ -18,8 +18,7 @@ from internal.utils.general_utils import inverse_sigmoid
 from ..modules.neural_decoder import NeuralDecoder, NeuralDecoderModule
 from ..modules.voxel_grid import VoxelGrid, VoxelGridModule
 from ..renders.implicit_renderer import ImplicitRenderingUtils
-from ..utils.implicit_wrappers import (AnchorFiltering, CameraWrapper,
-                                       NeuralGaussianWrapper)
+from ..utils.implicit_wrappers import AnchorFiltering, CameraWrapper, NeuralGaussianWrapper
 
 
 @dataclass
@@ -145,6 +144,13 @@ class ImplicitModelMixin:
 
     def get_features_for_rasterization(self, anchor_ids: torch.Tensor):
         return self.gaussians["features"][anchor_ids]
+
+    def pre_activate_all_properties(self):
+        pass
+
+    @property
+    def max_sh_degree(self):
+        return 0
 
     @property
     def get_anchors(self) -> torch.Tensor:

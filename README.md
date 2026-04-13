@@ -58,9 +58,9 @@ bash cag_gs/scripts/setup_env.sh
         ├─ sam2_large_d32
     ```
 
-### Training
+### Training && Evaluation
 
-Take the Building scene as an example. We partition the scene into 2 * 4 blocks for separate optimization.
+Take the Building scene as an example.
 
 #### Coarse Model Training
 
@@ -69,9 +69,12 @@ python main.py fit \
   --config cag_gs/configs/building/coarse.yaml \
   --name building-coarse
 ```
-The results of coarse model will be placed in `outputs/building-coarse`.
+The results of coarse model training will be placed in `outputs/building-coarse`.
 
 #### Scene Partitioning
+
+We partition the scene into 2 * 4 blocks for separate optimization.
+
 ```shell
 python cag_gs/tools/partition_scene.py \
   --project building \
@@ -79,6 +82,8 @@ python cag_gs/tools/partition_scene.py \
   --dataset_path datasets/benchmark/building \
   --partition_dim 2 4
 ```
+
+The partitioning results will be placed in `outputs/building/partition`.
 
 #### Block-wise Optimization
 ```shell
@@ -88,10 +93,19 @@ python cag_gs/tools/train_blocks.py \
 ```
 
 #### Block Merging
+```shell
+python cag_gs/tools/merge_blocks.py --project building
+```
 
-### Evaluation
+The path to the merged checkpoints is `outputs/building/merged/merged.ckpt`
 
-
+#### Rendering && Evaluation
+```shell
+python cag_gs/tools/render.py \
+  --ckpt_path outputs/building/merged/merged.ckpt \
+  --dataset_path data/benchmarks/building
+python cag_gs/tools/evaluate.py --render outputs/building/merged/render
+```
 
 ## 📖 Citation
 ```

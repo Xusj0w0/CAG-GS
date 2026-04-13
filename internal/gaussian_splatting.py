@@ -159,9 +159,10 @@ class GaussianSplatting(LightningModule):
                 eval_mode=False,
                 pre_activate=False,
             )
+            GaussianModelLoader.resume_optimization(gaussian_model.config, self.hparams["gaussian"])
 
         # replace config
-        self.hparams["gaussians"] = gaussian_model.config
+        self.hparams["gaussian"] = gaussian_model.config
         self.gaussian_model = gaussian_model
 
         if hasattr(self.gaussian_model, "max_sh_degree"):
